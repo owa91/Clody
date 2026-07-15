@@ -1,0 +1,8 @@
+flask
+waitress
+Flask_SQLAlchemy
+python-dotenv
+flask_bcrypt
+flask_socketio
+requests
+eventlet

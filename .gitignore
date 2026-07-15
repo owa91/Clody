@@ -1,0 +1,10 @@
+frontend
+.env
+database.db
+instance
+.venv
+.claude
+CLAUDE.md
+.idea
+/cdn
+*.pyc
