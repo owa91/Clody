@@ -18,15 +18,9 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 peers = {}
 
-# This process is a separate one — the main app's HTTP limits do not reach it,
-# and the relay is where the real volume lands. Budget in BYTES, not messages:
-# one 4 MB frame hurts as much as a thousand small ones, and eventlet relays
-# them all on a single event loop, so one greedy peer stalls every call.
-MAX_FRAME_BYTES = 512 * 1024          # a 1080p keyframe is well under this
-SCREEN_BUDGET = RateLimiter(per_minute=4_000_000 * 60, burst=8_000_000)  # ~4 MB/s
-VOICE_BUDGET = RateLimiter(per_minute=200_000 * 60, burst=400_000)       # ~200 KB/s (48k mono PCM ≈ 96 KB/s)
-# Unauthenticated and cross-origin by design (the caller pings it to pick a
-# server), so it is the one thing anyone on the internet can hit for free.
+MAX_FRAME_BYTES = 512 * 1024
+SCREEN_BUDGET = RateLimiter(per_minute=4_000_000 * 60, burst=8_000_000)
+VOICE_BUDGET = RateLimiter(per_minute=200_000 * 60, burst=400_000)
 PING_BUDGET = RateLimiter(per_minute=120, burst=30)
 
 
@@ -36,11 +30,6 @@ def _frame_size(data):
 
 @app.route("/ping")
 def ping():
-    # Health probe the caller pings cross-origin to pick the fastest server.
-    # It must carry a CORS header so the browser can actually READ the response
-    # (and thus tell a live 200 from a downed 5xx). The proxy only adds CORS on
-    # /socket.io, not here, so this is the sole source — no duplicate header. A
-    # plain no-credentials GET, so "*" is enough.
     if not PING_BUDGET.allow(request.remote_addr or "?"):
         return jsonify("Too many requests"), 429
 
@@ -81,8 +70,6 @@ def on_voice_frame(data):
         return
 
     size = _frame_size(data)
-    # Drop silently, not with an error: at ~23 frames/sec per speaker an error
-    # reply per frame would be its own flood.
     if size > MAX_FRAME_BYTES or not VOICE_BUDGET.allow(request.sid, cost=size or 1):
         return
 
