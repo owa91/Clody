@@ -34,13 +34,27 @@ class BMessage(db.Model):
 
 class Picnic(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(), nullable=True)
+    name = db.Column(db.String(), nullable=False)
     avatar = db.Column(db.String(), nullable=True)
     members = db.Column(db.PickleType(), nullable=False, default=list)
+    bans = db.Column(db.PickleType(), nullable=False, default=list)
     messages = db.Column(db.PickleType(), nullable=False, default=list)
+    comments = db.Column(db.PickleType(), nullable=True)
     admins = db.Column(db.PickleType(), nullable=False, default=list)
     data = db.Column(db.String(), nullable=False, default="{}")
+    link = db.Column(db.String(), nullable=True)
     owner = db.Column(db.Integer(), nullable=False)
+
+class PMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    branch = db.Column(db.Integer(), nullable=False)
+    cdn = db.Column(db.PickleType(), nullable=False, default=list)
+    content = db.Column(db.PickleType(), nullable=False, default=list)
+    read = db.Column(db.PickleType(), nullable=False, default=list)
+    data = db.Column(db.String(), nullable=False, default="{}")
+    created_at = db.Column(db.Integer(), nullable=False)
+    edited = db.Column(db.Boolean(), nullable=False, default=False)
+    author = db.Column(db.Integer(), nullable=False)
 
 class Report(db.Model):
     id = db.Column(db.Integer, primary_key=True)
