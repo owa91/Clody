@@ -52,26 +52,18 @@ app.register_blueprint(settings.app)
 app.register_blueprint(bcall.app)
 app.register_blueprint(adminpanel.app)
 
-# Budgets priced by what each route actually costs (measured): /api/login burns
-# ~98 ms of CPU on scrypt, the rest ~1 ms. eventlet runs one event loop, so ~10
-# logins/sec is the whole server — hence the tight budget there and a roomy one
-# everywhere else.
 (
     ratelimit.HttpLimits(default_per_minute=200, default_burst=60)
-    # Socket.IO polls continuously; any budget here kills live clients. Socket
-    # events are limited individually instead (see bcall.py).
     .exempt("/socket.io")
     .route("/api/login", 10, burst=5)
     .route("/api/register", 5, burst=3)
     .route("/api/cdn/avatars/upload", 5, burst=3)
     .route("/api/cdn/benches/upload", 30, burst=10)
     .route("/api/message/report", 10, burst=5)
-    # a thread full of images is one GET each — needs plenty of headroom
     .route("/cdn/", 600, burst=200)
     .init_app(app)
 )
 
-# A body has to be rejected before request.json parses it into memory.
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
 
 @app.after_request
