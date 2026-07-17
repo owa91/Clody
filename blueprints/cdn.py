@@ -46,6 +46,46 @@ def upload_bench_file():
 
     return jsonify({"filename": filename, "original_name": file.filename}), 200
 
+@app.post("/api/cdn/picnics/upload")
+def upload_picnic_file():
+    if not check_session(session):
+        return jsonify("Not Authorized"), 400
+
+    if "file" not in request.files:
+        return jsonify("Bad Request"), 400
+
+    file = request.files["file"]
+    id_picnic = request.form.get("id_picnic")
+
+    file.seek(0, 2)
+    file_size = file.tell()
+    file.seek(0)
+
+    if file_size > 30*1024*1024:
+        return jsonify("Bad Request"), 400
+
+    if file.filename == "" or id_picnic is None or not id_picnic.isdigit():
+        return jsonify("Bad Request"), 400
+
+    id_picnic = int(id_picnic)
+
+    picnic = Picnic.query.filter_by(id=id_picnic).first()
+
+    if picnic is None:
+        return jsonify("Not Found"), 404
+    elif session["user"]["id"] not in (picnic.admins or []):
+        return jsonify("Forbidden"), 403
+
+    _, file_extension = os.path.splitext(file.filename)
+
+    filename = secrets.token_hex(16) + file_extension.lower()
+
+    os.makedirs(f"cdn/picnics/{id_picnic}", exist_ok=True)
+
+    file.save(os.path.join(f"cdn/picnics/{id_picnic}", filename))
+
+    return jsonify({"filename": filename, "original_name": file.filename}), 200
+
 @app.post("/api/cdn/avatars/upload")
 def upload_avatar():
     if not check_session(session):
@@ -94,6 +134,23 @@ def get_file_bench(filename, bench):
     try:
         return send_from_directory(
             f"cdn/benches/{bench}",
+            filename,
+            as_attachment=False
+        )
+    except FileNotFoundError:
+        abort(404)
+
+@app.get("/cdn/picnics/<int:picnic>/<filename>")
+def get_file_picnic(filename, picnic):
+    if not check_session(session):
+        return jsonify("Not Authorized"), 400
+
+    if Picnic.query.filter_by(id=picnic).first() is None:
+        return abort(404)
+
+    try:
+        return send_from_directory(
+            f"cdn/picnics/{picnic}",
             filename,
             as_attachment=False
         )

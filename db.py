@@ -47,11 +47,19 @@ class Picnic(db.Model):
 
 class PMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    branch = db.Column(db.Integer(), nullable=False)
+    picnic = db.Column(db.Integer(), nullable=False)
     cdn = db.Column(db.PickleType(), nullable=False, default=list)
     content = db.Column(db.PickleType(), nullable=False, default=list)
     read = db.Column(db.PickleType(), nullable=False, default=list)
     data = db.Column(db.String(), nullable=False, default="{}")
+    created_at = db.Column(db.Integer(), nullable=False)
+    edited = db.Column(db.Boolean(), nullable=False, default=False)
+    author = db.Column(db.Integer(), nullable=False)
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    picnic = db.Column(db.Integer(), nullable=False)
+    content = db.Column(db.PickleType(), nullable=False, default=list)
     created_at = db.Column(db.Integer(), nullable=False)
     edited = db.Column(db.Boolean(), nullable=False, default=False)
     author = db.Column(db.Integer(), nullable=False)

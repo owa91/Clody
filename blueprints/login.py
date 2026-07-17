@@ -41,6 +41,8 @@ def register():
 
     if username is None or password is None or token is None:
         return jsonify("Bad Request"), 400
+    elif username == "clody" or username == "Clody":
+        return jsonify("Username is taken"), 403
 
     username = username.strip()
 
