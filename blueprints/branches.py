@@ -54,6 +54,30 @@ def get_branches():
 
     return jsonify(data["branches"]), 200
 
+@app.route("/api/branches/overview")
+def branches_overview():
+    if not check_session(session):
+        return jsonify("Not Authorized"), 400
+
+    user = User.query.filter_by(id=session["user"]["id"]).first()
+    ids = [b for b in (load_data(user).get("branches") or []) if b is not None]
+
+    # One request for the whole list instead of getBranch + listMessages per
+    # branch: each entry is the branch summary plus its unread count and newest
+    # timestamp, so the client never has to pull full message bodies just to
+    # paint badges and sort.
+    result = []
+    for bid in ids:
+        branch = Branch.query.filter_by(id=bid).first()
+        if branch is None:
+            continue
+        messages = BMessage.query.filter_by(branch=bid).all()
+        unread = sum(1 for m in messages if m.author != user.id and user.id not in (m.read or []))
+        last_at = max((m.created_at or 0 for m in messages), default=0)
+        result.append({**branch_summary(branch), "unread": unread, "last_at": last_at})
+
+    return jsonify(result), 200
+
 @app.route("/api/branch/create", methods=["POST"])
 def create_branch():
     if not check_session(session):

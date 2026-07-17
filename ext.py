@@ -33,6 +33,27 @@ def check_session(session):
     else:
         return True
 
+def is_anonymous(user_id):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return False
+    return not (load_data(user).get("settings") or {}).get("accepts_friend_requests", True)
+
+def are_friends(a_id, b_id):
+    user = User.query.filter_by(id=a_id).first()
+    if user is None:
+        return False
+    return b_id in (load_data(user).get("friends") or [])
+
+def visible_author(author_id, viewer_id):
+    if author_id == viewer_id:
+        return author_id
+    if not is_anonymous(author_id):
+        return author_id
+    if are_friends(author_id, viewer_id):
+        return author_id
+    return None
+
 def send_message(id, message):
     user = User.query.filter_by(id=id).first()
     if user is None:

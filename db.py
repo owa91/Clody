@@ -59,7 +59,10 @@ class PMessage(db.Model):
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     picnic = db.Column(db.Integer(), nullable=False)
-    content = db.Column(db.PickleType(), nullable=False, default=list)
+    message = db.Column(db.Integer(), nullable=False)
+    content = db.Column(db.String(), nullable=False)
+    likes = db.Column(db.PickleType(), nullable=False, default=list)
+    answer_to = db.Column(db.Integer(), nullable=True)
     created_at = db.Column(db.Integer(), nullable=False)
     edited = db.Column(db.Boolean(), nullable=False, default=False)
     author = db.Column(db.Integer(), nullable=False)

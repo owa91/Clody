@@ -6,14 +6,17 @@ import json
 
 app = Blueprint("picnics", "picnics")
 
-def picnic_summary(picnic):
+def picnic_summary(picnic, viewer_id=None):
     return {
         "id": picnic.id,
         "name": picnic.name,
         "avatar": picnic.avatar,
-        "members_count": len(picnic.members),
+        "members_count": len(picnic.members or []),
         "link": picnic.link,
         "supports_comments": picnic.comments is not None,
+        "is_member": viewer_id in (picnic.members or []),
+        "is_admin": viewer_id in (picnic.admins or []),
+        "is_owner": viewer_id == picnic.owner,
     }
 
 def user_picnics(user):
@@ -39,6 +42,29 @@ def get_picnics():
 
     return jsonify(data["picnics"]), 200
 
+@app.route("/api/picnics/overview")
+def picnics_overview():
+    if not check_session(session):
+        return jsonify("Not Authorized"), 400
+
+    user = User.query.filter_by(id=session["user"]["id"]).first()
+    ids = [p for p in (load_data(user).get("picnics") or []) if p is not None]
+
+    # One request for the whole list: each entry is the picnic summary plus its
+    # unread count and newest timestamp, so the menu never pulls full post
+    # bodies just to draw badges and sort.
+    result = []
+    for pid in ids:
+        picnic = Picnic.query.filter_by(id=pid).first()
+        if picnic is None:
+            continue
+        posts = PMessage.query.filter_by(picnic=pid).all()
+        unread = sum(1 for m in posts if m.author != user.id and user.id not in (m.read or []))
+        last_at = max((m.created_at or 0 for m in posts), default=0)
+        result.append({**picnic_summary(picnic, user.id), "unread": unread, "last_at": last_at})
+
+    return jsonify(result), 200
+
 @app.route("/api/picnic/get", methods=["POST"])
 def get_info_picnic():
     if not check_session(session):
@@ -52,7 +78,7 @@ def get_info_picnic():
     if picnic is None:
         return jsonify("Not Found"), 404
 
-    return jsonify(picnic_summary(picnic)), 200
+    return jsonify(picnic_summary(picnic, session["user"]["id"])), 200
 
 @app.route("/@/<link>")
 def relink(link):
@@ -80,7 +106,7 @@ def search_picnic():
 
     picnics = [p for p in Picnic.query.all() if needle in (p.name or "").lower()][:50]
 
-    return jsonify([picnic_summary(p) for p in picnics]), 200
+    return jsonify([picnic_summary(p, session["user"]["id"]) for p in picnics]), 200
 
 @app.route("/api/picnic/create", methods=["POST"])
 def create_picnic():
@@ -127,9 +153,9 @@ def create_picnic():
     set_user_picnics(user, user_picnics(user) + [picnic.id])
     db.session.commit()
 
-    socketio.emit("added_picnic", picnic_summary(picnic), to=user.id)
+    socketio.emit("added_picnic", picnic_summary(picnic, user.id), to=user.id)
 
-    return jsonify(picnic_summary(picnic)), 200
+    return jsonify(picnic_summary(picnic, user.id)), 200
 
 @app.route("/api/picnic/edit", methods=["POST"])
 def edit_picnic():
@@ -179,9 +205,9 @@ def edit_picnic():
     db.session.commit()
 
     for member_id in (picnic.members or []):
-        socketio.emit("update_picnic", picnic_summary(picnic), to=member_id)
+        socketio.emit("update_picnic", picnic_summary(picnic, member_id), to=member_id)
 
-    return jsonify(picnic_summary(picnic)), 200
+    return jsonify(picnic_summary(picnic, session["user"]["id"])), 200
 
 @app.route("/api/picnic/ban", methods=["POST"])
 def ban_user():
@@ -224,8 +250,8 @@ def ban_user():
 
     return jsonify("Success"), 200
 
-@app.route("/api/picnic/bans", methods=["POST"])
-def get_bans():
+@app.route("/api/picnic/manage", methods=["POST"])
+def manage_picnic():
     if not check_session(session):
         return jsonify("Not Authorized"), 400
 
@@ -236,10 +262,17 @@ def get_bans():
     picnic = Picnic.query.filter_by(id=id).first()
     if picnic is None:
         return jsonify("Not Found"), 404
+    # Membership rosters, admin list and bans are moderation detail — admin-only,
+    # deliberately absent from the summary every member gets.
     elif session["user"]["id"] not in (picnic.admins or []):
         return jsonify("Forbidden"), 403
 
-    return jsonify(picnic.bans or []), 200
+    return jsonify({
+        "members": picnic.members or [],
+        "admins": picnic.admins or [],
+        "owner": picnic.owner,
+        "bans": picnic.bans or [],
+    }), 200
 
 @app.route("/api/picnic/unban", methods=["POST"])
 def unban_user():
@@ -289,9 +322,9 @@ def join_picnic():
 
     db.session.commit()
 
-    socketio.emit("added_picnic", picnic_summary(picnic), to=user.id)
+    socketio.emit("added_picnic", picnic_summary(picnic, user.id), to=user.id)
 
-    return jsonify(picnic_summary(picnic)), 200
+    return jsonify(picnic_summary(picnic, user.id)), 200
 
 @app.route("/api/picnic/leave", methods=["POST"])
 def leave_picnic():
@@ -342,6 +375,9 @@ def delete_picnic():
         if member is not None:
             set_user_picnics(member, [p for p in user_picnics(member) if p != picnic.id])
 
+    # Delete comments too, not just posts — SQLite reuses row ids, so an orphaned
+    # comment would otherwise resurface under a future post that reuses the id.
+    Comment.query.filter_by(picnic=picnic.id).delete()
     PMessage.query.filter_by(picnic=picnic.id).delete()
     db.session.delete(picnic)
     db.session.commit()

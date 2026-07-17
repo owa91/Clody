@@ -38,6 +38,8 @@ def list_messages():
         return jsonify("Not Authorized"), 400
 
     branch = request.json.get("branch")
+    before_id = request.json.get("before_id")
+    limit = min(int(request.json.get("limit") or 30), 100)
     user = User.query.filter_by(id=session["user"]["id"]).first()
 
     if branch is None:
@@ -46,9 +48,21 @@ def list_messages():
     if branch not in user_branches(session) and not user.isadmin:
         return jsonify("Forbidden"), 403
 
-    messages = BMessage.query.filter_by(branch=branch).order_by(BMessage.created_at.asc()).all()
+    # Newest page first, older on scroll-up (id < before_id). Returned in
+    # chronological order so the thread can just prepend the next page on top.
+    query = BMessage.query.filter_by(branch=branch)
+    if before_id is not None:
+        query = query.filter(BMessage.id < before_id)
 
-    return jsonify([message_summary(m) for m in messages]), 200
+    rows = query.order_by(BMessage.id.desc()).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    rows.reverse()
+
+    return jsonify({
+        "messages": [message_summary(m) for m in rows],
+        "has_more": has_more,
+    }), 200
 
 @app.route("/api/bm/get", methods=["POST"])
 def get_message():

@@ -55,6 +55,8 @@ def list_pm():
         return jsonify("Not Authorized"), 400
 
     picnic = request.json.get("picnic")
+    before_id = request.json.get("before_id")
+    limit = min(int(request.json.get("limit") or 30), 100)
     if picnic is None:
         return jsonify("Bad Request"), 400
 
@@ -62,12 +64,22 @@ def list_pm():
     if picnic_row is None:
         return jsonify("Not Found"), 404
 
-    messages = PMessage.query.filter_by(picnic=picnic).order_by(PMessage.created_at.asc()).all()
-    viewer_is_admin = is_admin_of(picnic_row)
+    # Newest page first, older on scroll-up (id < before_id). Returned in
+    # chronological order so the feed can just prepend the next page on top.
+    query = PMessage.query.filter_by(picnic=picnic)
+    if before_id is not None:
+        query = query.filter(PMessage.id < before_id)
 
-    return jsonify(
-        [message_summary(m, session["user"]["id"], viewer_is_admin) for m in messages]
-    ), 200
+    rows = query.order_by(PMessage.id.desc()).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    rows.reverse()
+
+    viewer_is_admin = is_admin_of(picnic_row)
+    return jsonify({
+        "messages": [message_summary(m, session["user"]["id"], viewer_is_admin) for m in rows],
+        "has_more": has_more,
+    }), 200
 
 @app.route("/api/pm/get", methods=["POST"])
 def get_pm():
@@ -232,6 +244,9 @@ def delete_pm():
     picnic_id = message.picnic
 
     db.session.delete(message)
+    # Drop this post's comments too — SQLite reuses row ids, so leaving them would
+    # let them resurface under a future post that reuses this id.
+    Comment.query.filter_by(message=message_id).delete()
     picnic.messages = [m for m in (picnic.messages or []) if m != message_id]
     db.session.commit()
 
