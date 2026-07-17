@@ -62,10 +62,6 @@ def branches_overview():
     user = User.query.filter_by(id=session["user"]["id"]).first()
     ids = [b for b in (load_data(user).get("branches") or []) if b is not None]
 
-    # One request for the whole list instead of getBranch + listMessages per
-    # branch: each entry is the branch summary plus its unread count and newest
-    # timestamp, so the client never has to pull full message bodies just to
-    # paint badges and sort.
     result = []
     for bid in ids:
         branch = Branch.query.filter_by(id=bid).first()

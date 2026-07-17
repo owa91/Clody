@@ -50,9 +50,6 @@ def picnics_overview():
     user = User.query.filter_by(id=session["user"]["id"]).first()
     ids = [p for p in (load_data(user).get("picnics") or []) if p is not None]
 
-    # One request for the whole list: each entry is the picnic summary plus its
-    # unread count and newest timestamp, so the menu never pulls full post
-    # bodies just to draw badges and sort.
     result = []
     for pid in ids:
         picnic = Picnic.query.filter_by(id=pid).first()
@@ -262,8 +259,6 @@ def manage_picnic():
     picnic = Picnic.query.filter_by(id=id).first()
     if picnic is None:
         return jsonify("Not Found"), 404
-    # Membership rosters, admin list and bans are moderation detail — admin-only,
-    # deliberately absent from the summary every member gets.
     elif session["user"]["id"] not in (picnic.admins or []):
         return jsonify("Forbidden"), 403
 
@@ -375,8 +370,6 @@ def delete_picnic():
         if member is not None:
             set_user_picnics(member, [p for p in user_picnics(member) if p != picnic.id])
 
-    # Delete comments too, not just posts — SQLite reuses row ids, so an orphaned
-    # comment would otherwise resurface under a future post that reuses the id.
     Comment.query.filter_by(picnic=picnic.id).delete()
     PMessage.query.filter_by(picnic=picnic.id).delete()
     db.session.delete(picnic)

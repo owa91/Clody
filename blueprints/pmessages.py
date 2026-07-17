@@ -15,16 +15,6 @@ def message_data(message):
     except (TypeError, ValueError):
         return {}
 
-# A пикник speaks in one voice: who actually wrote a post is admin-only, so
-# `author` goes out to admins and is None for everyone else. Admins still need
-# it — the client uses it to skip counting an author's view of their own post,
-# and only an admin can ever be one.
-#
-# `read` is a view counter, not a delivery receipt, so it never goes out as a
-# list of ids — just the total, plus whether the asking viewer is in it.
-# viewer_id is left None for socket broadcasts: they fan out to every member
-# from whichever request triggered them, so the sender's session can't stand in
-# for the recipient's. A freshly created post is unread by everyone anyway.
 def message_summary(message, viewer_id=None, viewer_is_admin=False):
     return {
         "id": message.id,
@@ -244,8 +234,6 @@ def delete_pm():
     picnic_id = message.picnic
 
     db.session.delete(message)
-    # Drop this post's comments too — SQLite reuses row ids, so leaving them would
-    # let them resurface under a future post that reuses this id.
     Comment.query.filter_by(message=message_id).delete()
     picnic.messages = [m for m in (picnic.messages or []) if m != message_id]
     db.session.commit()
