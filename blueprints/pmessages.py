@@ -32,8 +32,6 @@ def message_summary(message, viewer_id=None, viewer_is_admin=False):
 def is_admin_of(picnic):
     return session["user"]["id"] in (picnic.admins or [])
 
-# One payload per member rather than a single room broadcast: `author` is
-# admin-only, so what each member may see differs.
 def broadcast(picnic, event, message):
     admins = picnic.admins or []
     for member_id in (picnic.members or []):
@@ -54,8 +52,6 @@ def list_pm():
     if picnic_row is None:
         return jsonify("Not Found"), 404
 
-    # Newest page first, older on scroll-up (id < before_id). Returned in
-    # chronological order so the feed can just prepend the next page on top.
     query = PMessage.query.filter_by(picnic=picnic)
     if before_id is not None:
         query = query.filter(PMessage.id < before_id)
