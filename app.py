@@ -6,7 +6,7 @@ import db
 import ext
 import ratelimit
 from ext import socketio
-from blueprints import static, login, friends, branches, bmessages, cdn, settings, bcall, adminpanel, picnics, pmessages, comments
+from blueprints import static, login, friends, branches, bmessages, cdn, settings, bcall, adminpanel, picnics, pmessages, comments, gifs
 from dotenv import load_dotenv
 import os
 import sys
@@ -54,6 +54,7 @@ app.register_blueprint(adminpanel.app)
 app.register_blueprint(picnics.app)
 app.register_blueprint(pmessages.app)
 app.register_blueprint(comments.app)
+app.register_blueprint(gifs.app)
 
 (
     ratelimit.HttpLimits(default_per_minute=200, default_burst=60)
@@ -62,7 +63,9 @@ app.register_blueprint(comments.app)
     .route("/api/register", 5, burst=3)
     .route("/api/cdn/avatars/upload", 5, burst=3)
     .route("/api/cdn/benches/upload", 30, burst=10)
+    .route("/api/cdn/benches/gif", 30, burst=10)
     .route("/api/cdn/picnics/upload", 30, burst=10)
+    .route("/api/gifs/search", 60, burst=20)
     .route("/api/message/report", 10, burst=5)
     .route("/api/picnic/create", 5, burst=3)
     .route("/api/picnic/search", 30, burst=10)

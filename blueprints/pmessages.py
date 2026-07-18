@@ -116,7 +116,7 @@ def create_pm():
     content = request.json.get("content")
     cdn = request.json.get("cdn") or []
 
-    if picnic_id is None or content is None or len(cdn) > 10:
+    if picnic_id is None or content is None or len(cdn) > 10 or len(content) > 5000:
         return jsonify("Bad Request"), 400
 
     picnic = Picnic.query.filter_by(id=picnic_id).first()
@@ -152,7 +152,7 @@ def edit_pm():
     id = request.json.get("id")
     content = request.json.get("content")
 
-    if id is None or content is None:
+    if id is None or content is None or len(content) > 5000:
         return jsonify("Bad Request"), 400
 
     message = PMessage.query.filter_by(id=id).first()
@@ -189,6 +189,38 @@ def mark_read():
     if session["user"]["id"] not in (message.read or []):
         message.read = (message.read or []) + [session["user"]["id"]]
         db.session.commit()
+
+    return jsonify("Success"), 200
+
+@app.route("/api/pm/pin_message", methods=["POST"])
+def pin_message():
+    if not check_session(session):
+        return jsonify("Not Authorized"), 400
+
+    id = request.json.get("id")
+    pin = request.json.get("pin")
+    if id is None or pin is None:
+        return jsonify("Bad Request"), 400
+
+    message = PMessage.query.filter_by(id=id).first()
+    if message is None:
+        return jsonify("Not Found"), 404
+
+    picnic = Picnic.query.filter_by(id=message.picnic).first()
+    if picnic is None:
+        return jsonify("Not Found"), 404
+    elif session["user"]["id"] not in (picnic.admins or []):
+        return jsonify("Forbidden"), 403
+
+    data = json.loads(picnic.data)
+    data["pinned"] = message.id if pin else None
+
+    picnic.data = json.dumps(data)
+    db.session.commit()
+
+    from blueprints.picnics import picnic_summary
+    for member_id in (picnic.members or []):
+        socketio.emit("update_picnic", picnic_summary(picnic, member_id), to=member_id)
 
     return jsonify("Success"), 200
 

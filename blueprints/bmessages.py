@@ -48,8 +48,6 @@ def list_messages():
     if branch not in user_branches(session) and not user.isadmin:
         return jsonify("Forbidden"), 403
 
-    # Newest page first, older on scroll-up (id < before_id). Returned in
-    # chronological order so the thread can just prepend the next page on top.
     query = BMessage.query.filter_by(branch=branch)
     if before_id is not None:
         query = query.filter(BMessage.id < before_id)
@@ -95,7 +93,7 @@ def create_message():
     cdn = request.json.get("cdn") or []
     answer_to = request.json.get("answer_to")
 
-    if branch is None or content is None or len(cdn) > 10:
+    if branch is None or content is None or len(cdn) > 10 or len(content) > 5000:
         return jsonify("Bad Request"), 400
 
     user = User.query.filter_by(id=session["user"]["id"]).first()
@@ -162,7 +160,7 @@ def edit_message():
     id = request.json.get("id")
     new_content = request.json.get("new_content")
 
-    if id is None or new_content is None:
+    if id is None or new_content is None or len(new_content) > 5000:
         return jsonify("Bad Request"), 400
 
     message = BMessage.query.filter_by(id=id).first()

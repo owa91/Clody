@@ -6,6 +6,8 @@ import json
 
 socketio = SocketIO()
 
+token_p_avatars = {}
+
 def init_app(app):
     socketio.init_app(app)
 

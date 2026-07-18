@@ -1,7 +1,8 @@
 import db
-from flask import Blueprint, request, session, jsonify, abort, url_for
+from flask import Blueprint, request, session, jsonify, abort, url_for, redirect
 from db import *
 from ext import *
+import secrets
 import json
 
 app = Blueprint("picnics", "picnics")
@@ -13,6 +14,7 @@ def picnic_summary(picnic, viewer_id=None):
         "avatar": picnic.avatar,
         "members_count": len(picnic.members or []),
         "link": picnic.link,
+        "data": json.loads(picnic.data),
         "supports_comments": picnic.comments is not None,
         "is_member": viewer_id in (picnic.members or []),
         "is_admin": viewer_id in (picnic.admins or []),
@@ -86,7 +88,7 @@ def relink(link):
     if picnic is None:
         abort(404)
 
-    return url_for(f"https://clody.lol/app/picnics/{picnic.id}"), 200
+    return redirect(f"/app/picnics/{picnic.id}"), 200
 
 @app.route("/api/picnic/search", methods=["POST"])
 def search_picnic():
@@ -105,15 +107,18 @@ def search_picnic():
 
     return jsonify([picnic_summary(p, session["user"]["id"]) for p in picnics]), 200
 
+# The picnic avatar is uploaded directly, owner-checked, at
+# /api/cdn/picnics/avatars/upload (blueprints/cdn.py) — no separate set step.
+
 @app.route("/api/picnic/create", methods=["POST"])
 def create_picnic():
     if not check_session(session):
         return jsonify("Not Authorized"), 400
 
     name = request.json.get("name")
-    avatar = request.json.get("avatar")
     link = request.json.get("link")
     comments = request.json.get("support_comments")
+    description = request.json.get("description")
 
     if name is None or comments is None:
         return jsonify("Bad Request"), 400
@@ -122,9 +127,15 @@ def create_picnic():
     if not name:
         return jsonify("Bad Request"), 400
 
+    if description:
+        if len(description) > 50:
+            return jsonify("Too Long"), 400
+
     link = (link or "").strip() or None
     if link is not None and Picnic.query.filter_by(link=link).first() is not None:
         return jsonify("Link is taken"), 403
+    elif len(link) > 10:
+        return jsonify("Link is too long"), 403
 
     user = User.query.filter_by(id=session["user"]["id"]).first()
     data = load_data(user)
@@ -134,7 +145,6 @@ def create_picnic():
 
     picnic = Picnic(
         name=name,
-        avatar=avatar,
         link=link,
         members=[user.id],
         bans=[],
@@ -142,6 +152,7 @@ def create_picnic():
         admins=[user.id],
         owner=user.id,
         comments=[] if comments else None,
+        data=json.dumps({"description": description})
     )
 
     db.session.add(picnic)
@@ -161,13 +172,17 @@ def edit_picnic():
 
     id = request.json.get("id")
     name = request.json.get("name")
-    avatar = request.json.get("avatar")
     link = request.json.get("link")
     comments = request.json.get("support_comments")
     admins = request.json.get("admins")
+    description = request.json.get("description")
 
     if id is None or name is None or comments is None or admins is None:
         return jsonify("Bad Request"), 400
+
+    if description:
+        if len(description) > 50:
+            return jsonify("Too Long"), 400
 
     picnic = Picnic.query.filter_by(id=id).first()
     if picnic is None:
@@ -190,9 +205,12 @@ def edit_picnic():
         admins = [picnic.owner] + admins
 
     picnic.name = name
-    picnic.avatar = avatar
     picnic.link = link
     picnic.admins = admins
+
+    data = json.loads(picnic.data)
+    data["description"] = description
+    picnic.data = json.dumps(data)
 
     if comments and picnic.comments is None:
         picnic.comments = []
@@ -396,3 +414,33 @@ def get_comments():
         return jsonify("Forbidden"), 403
 
     return jsonify(picnic.comments), 200
+
+@app.route("/api/picnic/set_original", methods=["POST"])
+def original():
+    if not check_session(session):
+        return jsonify("Not Authorized"), 400
+
+    id = request.json.get("id")
+    set = request.json.get("set")
+    if id is None:
+        return jsonify("Bad Request"), 400
+
+    # Site-admin only (the "оригинальный" badge is granted from the admin panel).
+    user = User.query.filter_by(id=session["user"]["id"]).first()
+    if user is None or not user.isadmin:
+        return jsonify("Forbidden"), 403
+
+    picnic = Picnic.query.filter_by(id=id).first()
+    if picnic is None:
+        return jsonify("Not Found"), 404
+
+    data = json.loads(picnic.data)
+    data["original"] = True if set else None
+
+    picnic.data = json.dumps(data)
+    db.session.commit()
+
+    for member_id in (picnic.members or []):
+        socketio.emit("update_picnic", picnic_summary(picnic, member_id), to=member_id)
+
+    return jsonify("Success"), 200
