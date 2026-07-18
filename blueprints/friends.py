@@ -105,6 +105,9 @@ def get_user():
         "is_enemy": need.id in (user_data.get("enemies") or []),
         "online": data.get("online", False),
         "avatar": need.avatar,
+        "thought": data.get("thought") or "",
+        "color": data.get("color") or "",
+        "description": data.get("description") or "",
     }
 
     is_self = need.id == user.id

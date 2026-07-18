@@ -107,9 +107,6 @@ def search_picnic():
 
     return jsonify([picnic_summary(p, session["user"]["id"]) for p in picnics]), 200
 
-# The picnic avatar is uploaded directly, owner-checked, at
-# /api/cdn/picnics/avatars/upload (blueprints/cdn.py) — no separate set step.
-
 @app.route("/api/picnic/create", methods=["POST"])
 def create_picnic():
     if not check_session(session):
@@ -120,7 +117,7 @@ def create_picnic():
     comments = request.json.get("support_comments")
     description = request.json.get("description")
 
-    if name is None or comments is None:
+    if name is None or comments is None or len(name) > 30:
         return jsonify("Bad Request"), 400
 
     name = name.strip()
@@ -134,7 +131,7 @@ def create_picnic():
     link = (link or "").strip() or None
     if link is not None and Picnic.query.filter_by(link=link).first() is not None:
         return jsonify("Link is taken"), 403
-    elif len(link) > 10:
+    elif len(link) > 30:
         return jsonify("Link is too long"), 403
 
     user = User.query.filter_by(id=session["user"]["id"]).first()
@@ -177,7 +174,7 @@ def edit_picnic():
     admins = request.json.get("admins")
     description = request.json.get("description")
 
-    if id is None or name is None or comments is None or admins is None:
+    if id is None or name is None or comments is None or admins is None or len(name) > 30:
         return jsonify("Bad Request"), 400
 
     if description:
@@ -199,6 +196,8 @@ def edit_picnic():
         taken = Picnic.query.filter_by(link=link).first()
         if taken is not None and taken.id != picnic.id:
             return jsonify("Link is taken"), 403
+        elif len(link) > 30:
+            return jsonify("Link is too long"), 403
 
     admins = [a for a in dict.fromkeys(admins) if a in (picnic.members or [])]
     if picnic.owner not in admins:
@@ -425,7 +424,6 @@ def original():
     if id is None:
         return jsonify("Bad Request"), 400
 
-    # Site-admin only (the "оригинальный" badge is granted from the admin panel).
     user = User.query.filter_by(id=session["user"]["id"]).first()
     if user is None or not user.isadmin:
         return jsonify("Forbidden"), 403
