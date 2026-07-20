@@ -73,6 +73,13 @@ class Report(db.Model):
     data = db.Column(db.String(), nullable=False, default="{}")
     author = db.Column(db.Integer(), nullable=False)
 
+class Reaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ispicnic = db.Column(db.Boolean(), nullable=False, default=False)
+    message = db.Column(db.Integer(), nullable=False)
+    emoji = db.Column(db.String(), nullable=False)
+    author = db.Column(db.Integer(), nullable=False)
+
 
 def reset_online_status():
     changed = False

@@ -131,7 +131,7 @@ def create_picnic():
     link = (link or "").strip() or None
     if link is not None and Picnic.query.filter_by(link=link).first() is not None:
         return jsonify("Link is taken"), 403
-    elif len(link) > 30:
+    if link is not None and len(link) > 30:
         return jsonify("Link is too long"), 403
 
     user = User.query.filter_by(id=session["user"]["id"]).first()

@@ -4,6 +4,7 @@ from flask import Blueprint, request, session, jsonify
 from db import *
 from ext import *
 import json
+import emoji
 
 app = Blueprint("comments", "comments")
 
@@ -47,8 +48,6 @@ def list_comments():
     elif picnic.comments is None:
         return jsonify("Comments are disabled"), 403
 
-    # Newest first, paged: the client shows the first page and asks for older
-    # ones (id < before_id) as it scrolls down.
     query = Comment.query.filter_by(message=message_id)
     if before_id is not None:
         query = query.filter(Comment.id < before_id)
@@ -117,8 +116,6 @@ def create_comment():
     db.session.add(comment)
     db.session.commit()
 
-    # Fan out per member: an anonymous author is masked differently for each
-    # recipient, so there's no one shared payload.
     for member_id in (picnic.members or []):
         socketio.emit("new_comment", comment_summary(comment, member_id), to=member_id)
 
