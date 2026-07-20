@@ -12,6 +12,7 @@ import os
 import sys
 import subprocess
 from datetime import timedelta
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 load_dotenv()
 
@@ -31,6 +32,7 @@ app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
 app.secret_key = os.getenv("SECRET_KEY")
 app.config.update(
@@ -62,6 +64,9 @@ app.register_blueprint(reactions.app)
     .exempt("/socket.io")
     .route("/api/login", 10, burst=5)
     .route("/api/register", 5, burst=3)
+    .route("/api/verification/login", 5, burst=3)
+    .route("/api/verification/set_email", 5, burst=3)
+    .route("/api/verification", 10, burst=5)
     .route("/api/cdn/avatars/upload", 5, burst=3)
     .route("/api/cdn/benches/upload", 30, burst=10)
     .route("/api/cdn/benches/gif", 30, burst=10)

@@ -19,7 +19,7 @@ def load_data(user):
     except (TypeError, ValueError):
         return {}
 
-def check_session(session):
+def check_session(session, allow_unverified=False):
     if session.get("user") is None:
         return False
 
@@ -32,8 +32,11 @@ def check_session(session):
 
     if data.get("logout_devices_at") is not None and data.get("logout_devices_at") >= session["user"]["login_at"]:
         return False
-    else:
-        return True
+
+    if not allow_unverified and data.get("email") is None:
+        return False
+
+    return True
 
 def is_anonymous(user_id):
     user = User.query.filter_by(id=user_id).first()

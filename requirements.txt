@@ -7,3 +7,5 @@ flask_socketio
 requests
 eventlet
 emoji
+ua-parser
+resend
