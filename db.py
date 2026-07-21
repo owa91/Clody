@@ -73,6 +73,13 @@ class Report(db.Model):
     data = db.Column(db.String(), nullable=False, default="{}")
     author = db.Column(db.Integer(), nullable=False)
 
+class PicnicReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    picnic_id = db.Column(db.Integer, nullable=False)
+    # Nullable so rows written before these columns existed still load.
+    author = db.Column(db.Integer(), nullable=True)
+    created_at = db.Column(db.Integer(), nullable=True)
+
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ispicnic = db.Column(db.Boolean(), nullable=False, default=False)

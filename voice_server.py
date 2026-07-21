@@ -108,5 +108,10 @@ def on_screen_frame(data):
 
 
 if __name__ == "__main__":
+    # debug MUST stay off here. This process is meant to be reachable from the
+    # open internet — clients connect to it directly for media — so the Werkzeug
+    # debugger on a traceback would hand anyone a shell. Same reason
+    # allow_unsafe_werkzeug is gone: it exists only to switch that guard off.
+    debug = os.getenv("VOICE_DEBUG") == "1"
     print("voice server listening on :20002")
-    socketio.run(app, host="0.0.0.0", port=20002, allow_unsafe_werkzeug=True, debug=True)
+    socketio.run(app, host="0.0.0.0", port=20002, debug=debug)

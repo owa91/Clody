@@ -16,7 +16,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 load_dotenv()
 
-DEBUG = True
+DEBUG = False
 
 
 def spawn_voice_server():
@@ -73,6 +73,7 @@ app.register_blueprint(reactions.app)
     .route("/api/cdn/picnics/upload", 30, burst=10)
     .route("/api/gifs/search", 60, burst=20)
     .route("/api/message/report", 10, burst=5)
+    .route("/api/picnic/report", 10, burst=5)
     .route("/api/reaction/create", 60, burst=20)
     .route("/api/reaction/delete", 60, burst=20)
     .route("/api/picnic/create", 5, burst=3)
@@ -94,4 +95,4 @@ def add_header(response):
 def get_favicon():
     return send_file("favicon.ico")
 
-socketio.run(app, debug=DEBUG, allow_unsafe_werkzeug=True, host="0.0.0.0", port=20001)
+socketio.run(app, debug=DEBUG, host="0.0.0.0", port=20001)
